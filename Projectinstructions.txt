@@ -1,0 +1,54 @@
+Build a one-page website that receives MIDI input and plays a Web Audio synth you implement. You will use the provided midi.js and create a new MIDIengine() in your main.js file, attach callbacks for note on and note off, manage polyphonic notes, and deploy on GitHub Pages.
+
+Learning outcomes
+Initialize and control an AudioContext after a user gesture.
+Receive MIDI input using the provided MIDIengine (Web MIDI under the hood).
+Parse Note On and Note Off to trigger a synth voice with pitch and velocity.
+Convert MIDI note numbers to frequency with A4 = 440 (mtof).
+Manage polyphony via a note->voice map.
+Deploy a static site on GitHub Pages.
+What is provided
+index.html: Minimal page with a Start button and status text.
+midi.js: A MIDI helper that exposes a default class MIDIengine. Do not modify this file.
+What you must build
+main.js: js file that creates the AudioContext and master gain, instantiates new MIDIengine(), assigns onNoteOn and onNoteOff callbacks, and manages active notes.
+synth.js: Your Synth class (a single voice) with an amplitude envelope and either a filter or delay in the signal path.
+Technical requirements (must-have)
+Synth class (synth.js):
+Contains at least one OscillatorNode.
+Contains a GainNode used as the amplitude envelope.
+Contains either a BiquadFilterNode or a DelayNode in the signal chain.
+Implements MIDI note number to frequency conversion inside the class (use 440 * 2 ** ((note - 69) / 12)).
+has methods start(midiNote, velocity, when) and stop(when).
+main.js:
+Creates an AudioContext.
+Creates a master GainNode and connects it to ctx.destination.
+Instantiates const midi = new MIDIengine() from the provided file.
+Assigns callbacks:
+midi.onNoteOn = function (note, velocity) { ... } creates a new Synth voice and calls start.
+midi.onNoteOff = function (note) { ... } finds the matching voice and calls stop.
+Keeps track of active notes (polyphony) using a structure like const voices = new Map() keyed by MIDI note number.
+Deploy the working site on GitHub Pages.
+Go to the template repository link in GitHub.
+
+Click the green “Use this template” button and choose “Create a new repository.”
+
+Name your repo (e.g., midi-synth) and keep it public.
+
+Once the repo is created, go to your repo’s Settings → Pages.
+
+Under Build and deployment, set Source to Deploy from a branch.
+
+Set Branch to main and Folder to / (root), then click Save.
+
+Wait a minute — GitHub will publish your site at:
+https://<your-username>.github.io/<repo-name>/
+
+Submission
+Live site URL: https://<username>.github.io/<repo-name>/
+Video walkthrough (~3 minutes): screen share + voiceover demonstrating
+File structure and how you instantiate new MIDIengine().
+Your Synth class: oscillator, envelope gain, and chosen filter or delay.
+Velocity-to-gain mapping and the ADSR ramps.
+Polyphony mapping/voice management
+A short live demo phrase to show Note On/Off behavior.
