@@ -1,3 +1,9 @@
+File Locations: 
+index.html = project1jaydenstern/index.html
+main.js = project1jaydenstern/main.js
+midi.js = project1jaydenstern/midi.js
+synth.js = project1jaydenstern/synth.js
+
 Basics: 
 Website name: "Computer Programming for Music Project 1"
 
