@@ -1,0 +1,111 @@
+Web Audio & JavaScript Quiz Review Guide
+========================================
+
+# Web Audio Essentials
+- **AudioContext (ctx)**
+  - ctx.destination → final output
+  - ctx.currentTime → master clock
+  - ctx.resume() → must be called after user gesture
+
+- **OscillatorNode (osc)**
+  - osc.frequency.value = 440
+  - osc.type = "sine" | "square" | "sawtooth" | "triangle"
+  - osc.start(when), osc.stop(when)
+  - osc.connect(node)
+
+- **GainNode (gain)**
+  - gain.gain.value (0–1 typical)
+  - Automation: setValueAtTime, linearRampToValueAtTime, cancelScheduledValues
+  - gain.connect(next)
+
+- **BiquadFilterNode (filter)**
+  - filter.type = "lowpass" | "highpass" | etc.
+  - filter.frequency.value, filter.Q.value
+  - filter.connect(next)
+
+### Common Chains
+- osc → gain → destination
+- osc → gain → filter → destination
+
+### Scheduling Pattern
+```
+const t = ctx.currentTime;
+gain.gain.setValueAtTime(0.0001, t);
+gain.gain.linearRampToValueAtTime(0.5, t + 0.02);
+gain.gain.linearRampToValueAtTime(0.0, t + 0.5);
+osc.start(t);
+osc.stop(t + 0.5);
+```
+
+---
+
+# Debugging Checklist
+1. No sound → check ctx.resume(), connections, gain not 0, osc started
+2. InvalidStateError (osc.start twice) → use new OscillatorNode
+3. Pops → ramp gain instead of instant changes
+4. Automation fails → automate AudioParam, not node
+5. Type issues → use `.value`, convert strings to numbers
+6. Safari/iOS → must start in user event
+
+---
+
+# Concept Questions
+- destination = final output node
+- currentTime = timeline for scheduling
+- resume() = required to start audio on user input
+- gain vs gain.value = param vs numeric
+- Oscillator restart? No, new node required
+- cancelScheduledValues() = clear queued automation
+- Array vs Object access: arr[0], obj.key
+- let vs const = reassignment rules
+
+---
+
+# Live Coding Template
+```html
+<button id="startBtn">Start Tone</button>
+<input id="freq" type="range" min="100" max="1200" value="440">
+```
+
+```js
+let ctx, master;
+document.querySelector("#startBtn").addEventListener("click", () => {
+  if (!ctx) {
+    ctx = new AudioContext();
+    master = ctx.createGain();
+    master.gain.value = 0.8;
+    master.connect(ctx.destination);
+  }
+  ctx.resume();
+
+  const osc = ctx.createOscillator();
+  const vca = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+
+  osc.type = "sawtooth";
+  osc.frequency.value = Number(document.querySelector("#freq").value);
+  filter.type = "lowpass";
+  filter.frequency.value = 12000;
+
+  const t = ctx.currentTime;
+  vca.gain.setValueAtTime(0.0001, t);
+  vca.gain.linearRampToValueAtTime(0.5, t + 0.01);
+  vca.gain.linearRampToValueAtTime(0.0, t + 0.3);
+
+  osc.connect(vca);
+  vca.connect(filter);
+  filter.connect(master);
+
+  osc.start(t);
+  osc.stop(t + 0.3);
+});
+```
+
+---
+
+# DOM & JS Basics
+- querySelector, addEventListener
+- if/else, ===, >, <
+- while, for, for...of
+- Math operators (+, -, *, /, %)
+- console.log() for debugging

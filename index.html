@@ -1,12 +1,116 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-    <script type="module" src="main.js"></script>
-</head>
-<body>
-    <button>Start audio</button>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, user-scalable=no"
+    />
+    <title>MIDI Synth (Web Audio + Web MIDI)</title>
+    <style>
+      :root {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      body {
+        margin: 2rem;
+        line-height: 1.4;
+      }
+      button {
+        font-size: 1rem;
+        padding: 0.6rem 1rem;
+        cursor: pointer;
+      }
+      .row {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .panel {
+        padding: 1rem;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+      }
+      .muted {
+        color: #666;
+      }
+      label {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      input[type="range"] {
+        width: 200px;
+      }
+      code {
+        background: #f6f6f6;
+        padding: 0.1rem 0.35rem;
+        border-radius: 0.35rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>MIDI-Controlled Web Audio Synth</h1>
 
-</body>
+    <div class="row">
+      <button id="startBtn">Start Audio</button>
+      <button id="stopBtn" disabled>Stop Audio</button>
+      <div id="status" class="muted">Waiting for user gesture…</div>
+    </div>
+
+    <div class="row" style="margin-top: 1rem">
+      <div class="panel">
+        <strong>Connected MIDI Inputs</strong>
+        <div id="inputs" class="muted">None yet</div>
+      </div>
+
+      <div class="panel">
+        <strong>Master</strong><br />
+        <label
+          >Gain
+          <input
+            id="masterGain"
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value="0.7"
+          />
+          <span id="masterGainVal">0.70</span>
+        </label>
+        <label
+          >Filter Cutoff
+          <input
+            id="cutoff"
+            type="range"
+            min="200"
+            max="8000"
+            step="1"
+            value="2000"
+          />
+          <span id="cutoffVal">2000 Hz</span>
+        </label>
+        <label
+          >Filter Resonance (Q)
+          <input
+            id="resonance"
+            type="range"
+            min="0.5"
+            max="20"
+            step="0.1"
+            value="0.8"
+          />
+          <span id="resVal">0.8</span>
+        </label>
+      </div>
+    </div>
+
+    <p class="muted" style="margin-top: 1rem">
+      Tip: make sure you’re on HTTPS (GitHub Pages is) so Web MIDI works.<br />
+      Velocity ↦ amplitude uses a perceptual curve ((v/127)^2).
+    </p>
+
+    <script src="./midi.js"></script>
+    <script type="module" src="./main.js"></script>
+  </body>
 </html>

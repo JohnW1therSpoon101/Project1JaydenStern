@@ -9,5 +9,6 @@ Website name: "Computer Programming for Music Project 1"
 
 ....................................
 Index.html
-Display txt = "Welcome 2 WebInstrument"
-Display txt = "Built by: Jayden Stern" 
+- make the background of the website black
+Display txt = "Welcome 2 WebInstrument" (make in cursive font)
+Display txt = "Built by: Jayden Stern" (make in cursive font)
