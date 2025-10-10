@@ -10,5 +10,37 @@ Website name: "Computer Programming for Music Project 1"
 ....................................
 Index.html
 - make the background of the website black
-Display txt = "Welcome 2 WebInstrument" (make in cursive font)
-Display txt = "Built by: Jayden Stern" (make in cursive font)
+- Display txt = "Welcome 2 WebInstrument" (make in cursive font)(this is the OFFICIAL TITLE)
+- Display txt = "Built by: Jayden Stern" (make in cursive font)
+- display txt = "for more click HERE"
+- - HERE = LINKTREE LINK: https://linktr.ee/stxrntheartist?utm_source=linktree_profile_share&ltsid=c8144ae5-97a2-4826-ab14-50953b2441ec
+- Include music related emoji's all throughout the website so it looks pretty.
+
+Midi Detection: 
+- provides a list of connected midi device options
+- lets the user pick which device to use 
+- provides a refresh button 
+
+
+Prebuilt sound library: users will pick from a list of presets, or hit custom preset to build their own sound
+Presets = this is going to be empty for now. when users go to chose, only display the custom option for them to select 
+
+Controls: 
+Sliders: 
+- Oscillators
+- - User will pick between 1-3 oscillators
+- - - user will also pick the kind of wave form
+- mono (button)
+- - will have a box to check whether user wants to use it or not. 
+- - if selected, different kind of slide happens, itll be like a weird slide inbetween notes, not upon the start of the note
+- Glide
+- master (gain)
+- Delay Mix
+- - only when delay is selected, provide initial delay customizations
+- Reverb Mix
+- - only when reverb is selected, provide initial delay customization
+- Distortion Drive
+
+Log: 
+- Keep a live log displayed at the bottom of the website so that the user can see what's going on when the midi is used. 
+
