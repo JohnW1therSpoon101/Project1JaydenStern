@@ -1,314 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>MIDI Synth</title>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MIDI Synth — Glide + FX</title>
+  <style>
+    :root{--bg:#0b0f14;--fg:#e6ebef;--card:#121821;--muted:#94a3b8;--line:#1f2a44;--accent:#2563eb}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:980px;margin:0 auto;padding:22px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:0 0 16px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column;gap:6px}
+    h1{margin:0 0 10px;font-size:26px}
+    .badge{background:#1e293b;border:1px solid #334155;border-radius:999px;padding:3px 10px;font-size:12px}
+    button{background:var(--accent);border:none;color:#fff;padding:10px 14px;border-radius:10px;font-weight:600;cursor:pointer}
+    button.secondary{background:#334155}
+    label{font-weight:600}
+    .sub{color:var(--muted);font-size:12px}
+    input[type="range"]{width:260px}
+    .status{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0f172a;color:#cbd5e1;padding:8px 10px;border-radius:8px}
+    .logs{max-height:240px;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;background:#0f172a;border:1px solid var(--line);border-radius:12px;padding:12px;white-space:pre-wrap}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>MIDI Synth <span class="badge">Glide + Reverb + Distortion + Delay</span></h1>
+    <p id="status" class="status">Click Start Audio → play your MIDI device. Open DevTools for extra logs.</p>
 
-    <style>
-      :root {
-        --bg: #000;
-        --white: #f4f4f4;
-        --yellow: #ffd54a;
-        --red: #ff5252;
-        --muted: #a0a0a0;
-        --card: #0f0f0f;
-        --border: #222;
-        --accent: #ffd54a;
-      }
-
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-        background: var(--bg);
-        color: var(--white);
-        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Inter,
-          Helvetica, Arial;
-      }
-
-      .wrap {
-        max-width: 1000px;
-        margin: 40px auto;
-        padding: 0 16px;
-      }
-
-      h1 {
-        margin: 0 0 6px;
-        font-size: 2rem;
-        color: var(--white);
-      }
-
-      .sub {
-        color: var(--muted);
-        margin-bottom: 18px;
-      }
-
-      .row {
-        display: grid;
-        gap: 16px;
-        grid-template-columns: 1fr;
-      }
-
-      @media (min-width: 900px) {
-        .row {
-          grid-template-columns: 1.2fr 0.8fr;
-        }
-      }
-
-      .card {
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 16px;
-      }
-
-      .card h2 {
-        margin: 0 0 10px;
-        font-size: 1.05rem;
-        color: var(--yellow);
-        letter-spacing: 0.2px;
-      }
-
-      .controls {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        align-items: center;
-      }
-
-      button,
-      select {
-        background: #111;
-        color: var(--white);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 10px 14px;
-        font-size: 0.95rem;
-        cursor: pointer;
-      }
-
-      button:hover,
-      select:hover {
-        border-color: var(--accent);
-      }
-
-      .start {
-        color: var(--yellow);
-      }
-      .stop {
-        color: var(--red);
-      }
-
-      .status-line {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        color: var(--yellow);
-        margin-top: 8px;
-      }
-
-      .devices {
-        margin: 0;
-        padding: 0;
-        list-style: none;
-        border-top: 1px dashed var(--border);
-      }
-
-      .devices li {
-        padding: 10px 0;
-        border-bottom: 1px dashed var(--border);
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-      }
-
-      .devices small {
-        color: var(--muted);
-      }
-
-      .slider {
-        display: grid;
-        grid-template-columns: 130px 1fr 60px;
-        gap: 10px;
-        align-items: center;
-      }
-
-      .slider label {
-        color: var(--white);
-      }
-
-      input[type="range"] {
-        -webkit-appearance: none;
-        width: 100%;
-        height: 6px;
-        background: #131313;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-      }
-
-      input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: var(--yellow);
-        border: 1px solid #333;
-      }
-
-      .grid2 {
-        display: grid;
-        gap: 12px;
-        grid-template-columns: 1fr;
-      }
-
-      @media (min-width: 600px) {
-        .grid2 {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-
-      .pill {
-        display: inline-block;
-        padding: 4px 10px;
-        border: 1px solid var(--border);
-        border-radius: 999px;
-        background: #0a0a0a;
-        color: var(--muted);
-        font-size: 0.85rem;
-        text-align: center;
-      }
-
-      .hint {
-        color: var(--muted);
-        font-size: 0.9rem;
-      }
-    </style>
-
-    <!-- Inline favicon to prevent 404 -->
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='100%25' height='100%25' fill='black'/%3E%3Cpath d='M10 54 L54 10' stroke='%23ffd54a' stroke-width='8'/%3E%3C/svg%3E"
-    />
-  </head>
-
-  <body>
-    <div class="wrap">
-      <h1>MIDI Synth</h1>
-      <div class="sub">
-        Black background • white text • accents in
-        <span style="color: var(--yellow)">yellow</span> &
-        <span style="color: var(--red)">red</span>.
-      </div>
-
+    <div class="card">
       <div class="row">
-        <div class="card">
-          <h2>Controls</h2>
-          <div class="controls" style="margin-bottom: 10px">
-            <button id="startBtn" class="start">Start Audio</button>
-            <button id="stopBtn" class="stop">Stop Audio</button>
+        <button id="startBtn">Start Audio</button>
+        <button id="stopBtn" class="secondary">Stop Audio</button>
+        <span id="deviceInfo" class="badge">No MIDI yet</span>
+      </div>
+    </div>
 
-            <select id="midiSelect" title="Select MIDI Input"></select>
-            <button id="refreshBtn" title="Refresh device list">Refresh</button>
-
-            <select id="waveSelect" title="Waveform">
-              <option value="sawtooth">Sawtooth</option>
-              <option value="square">Square</option>
-              <option value="triangle">Triangle</option>
-              <option value="sine">Sine</option>
-            </select>
-          </div>
-
-          <div class="grid2">
-            <div class="slider">
-              <label for="masterGain">Master Volume</label>
-              <input
-                id="masterGain"
-                type="range"
-                min="0"
-                max="1"
-                step="0.001"
-                value="0.9"
-              />
-              <span id="masterGainVal" class="pill">0.90</span>
-            </div>
-
-            <div class="slider">
-              <label for="cutoff">Filter Cutoff (Hz)</label>
-              <input
-                id="cutoff"
-                type="range"
-                min="200"
-                max="8000"
-                step="1"
-                value="4000"
-              />
-              <span id="cutoffVal" class="pill">4000</span>
-            </div>
-
-            <div class="slider">
-              <label for="resQ">Filter Q</label>
-              <input
-                id="resQ"
-                type="range"
-                min="0.1"
-                max="20"
-                step="0.1"
-                value="1.0"
-              />
-              <span id="resQVal" class="pill">1.0</span>
-            </div>
-
-            <div class="slider">
-              <label for="attack">Attack (s)</label>
-              <input
-                id="attack"
-                type="range"
-                min="0.001"
-                max="0.2"
-                step="0.001"
-                value="0.01"
-              />
-              <span id="attackVal" class="pill">0.010</span>
-            </div>
-
-            <div class="slider">
-              <label for="release">Release (s)</label>
-              <input
-                id="release"
-                type="range"
-                min="0.01"
-                max="0.8"
-                step="0.01"
-                value="0.12"
-              />
-              <span id="releaseVal" class="pill">0.12</span>
-            </div>
-          </div>
-
-          <p class="status-line">Status: <span id="status">Idle</span></p>
-          <p class="hint">
-            Tip: Click <b>Start Audio</b> once to unlock sound. Then select a
-            MIDI device and play!
-          </p>
+    <div class="card">
+      <div class="row">
+        <div class="col">
+          <label>Glide (ms) <span class="sub" id="glideVal">0</span></label>
+          <input id="glide" type="range" min="0" max="400" step="10" value="0" />
         </div>
-
-        <div class="card">
-          <h2>Detected MIDI Inputs</h2>
-          <ul id="deviceList" class="devices"></ul>
-          <p class="hint">
-            Plug in your device, then click <b>Refresh</b>. The browser may
-            prompt for MIDI permission.
-          </p>
-          <p class="hint" style="margin-top: 8px">
-            If you see a <b>401 getmerlin.in</b> error — that’s just a browser
-            extension, not this site.
-          </p>
+        <div class="col">
+          <label>Reverb Mix <span class="sub" id="reverbVal">0.20</span></label>
+          <input id="reverb" type="range" min="0" max="1" step="0.01" value="0.20" />
+        </div>
+        <div class="col">
+          <label>Distortion Drive <span class="sub" id="distVal">0.30</span></label>
+          <input id="dist" type="range" min="0" max="1" step="0.01" value="0.30" />
+        </div>
+        <div class="col">
+          <label>Delay Mix <span class="sub" id="delayMixVal">0.20</span></label>
+          <input id="delayMix" type="range" min="0" max="1" step="0.01" value="0.20" />
+        </div>
+        <div class="col">
+          <label>Delay Time (ms) <span class="sub" id="delayTimeVal">250</span></label>
+          <input id="delayTime" type="range" min="20" max="800" step="5" value="250" />
         </div>
       </div>
     </div>
 
-    <!-- 🧩 Script order (important) -->
-    <script type="module" src="./midi-bridge.js"></script>
-    <script src="./synth.js"></script>
-    <script src="./main.js"></script>
-  </body>
+    <div class="card">
+      <strong>Logs</strong>
+      <div id="logs" class="logs"></div>
+    </div>
+  </div>
+
+  <script src="midi.js"></script>
+  <script src="synth.js"></script>
+  <script src="main.js"></script>
+</body>
 </html>

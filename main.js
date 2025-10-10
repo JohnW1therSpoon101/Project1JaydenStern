@@ -1,420 +1,288 @@
-// ===== Logger =====
-const DEBUG = true;
-const t = () => new Date().toISOString();
-const log = (...a) => DEBUG && console.log(`[main ${t()}]`, ...a);
-const warn = (...a) => DEBUG && console.warn(`[main ${t()} WARNING]`, ...a);
-const err = (...a) => DEBUG && console.error(`[main ${t()} ERROR]`, ...a);
+/* main.js — COMPLETE
+   - Verbose logs to both console AND on-page "Logs" box
+   - Uses provided MIDIengine when available; falls back to Web MIDI
+   - Same-note retriggering (fresh voice each tap)
+   - Glide (portamento) + FX sliders (reverb, distortion, delay) wired live
+   - Start/Stop Audio buttons with status text
+*/
 
-// ===== Config =====
-const MAX_VOICES_PER_NOTE = 8; // prevent infinite stacking on one key
-const MAX_TOTAL_VOICES = 64; // global safety cap
+(() => {
+  // ---------- Tiny helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const logBox = $("logs");
 
-// ===== UI =====
-const statusEl = document.getElementById("status");
-const startBtn = document.getElementById("startBtn");
-const stopBtn = document.getElementById("stopBtn");
-const deviceListEl = document.getElementById("deviceList");
-const midiSelectEl = document.getElementById("midiSelect");
-const refreshBtn = document.getElementById("refreshBtn");
+  function now() {
+    const d = new Date();
+    return d.toISOString().replace("T", " ").replace("Z", "");
+  }
 
-// sliders / selects
-const masterGainEl = document.getElementById("masterGain");
-const masterGainVal = document.getElementById("masterGainVal");
-const cutoffEl = document.getElementById("cutoff");
-const cutoffVal = document.getElementById("cutoffVal");
-const resQEl = document.getElementById("resQ");
-const resQVal = document.getElementById("resQVal");
-const attackEl = document.getElementById("attack");
-const attackVal = document.getElementById("attackVal");
-const releaseEl = document.getElementById("release");
-const releaseVal = document.getElementById("releaseVal");
-const waveSelect = document.getElementById("waveSelect");
+  function vlog(tag, ...args) {
+    // pretty console log
+    console.log(`[${now()}] [${tag}]`, ...args);
+    // UI log panel (if present)
+    if (logBox) {
+      const msg = args
+        .map(a =>
+          typeof a === "object" ? JSON.stringify(a, null, 0) : String(a)
+        )
+        .join(" ");
+      logBox.textContent += `\n[${now()}] [${tag}] ${msg}`;
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+  }
 
-// ===== Audio graph =====
-let audioCtx = null;
-let master = null;
-// voices now stores a STACK (array) of voices for each MIDI note
-/** @type {Map<number, SynthVoice[]>} */
-let voices = new Map();
+  // ---------- DOM refs ----------
+  const statusEl = $("status");
+  const deviceEl = $("deviceInfo");
+  const startBtn = $("startBtn");
+  const stopBtn = $("stopBtn");
 
-function mtof(n) {
-  return 440 * Math.pow(2, (n - 69) / 12);
-}
+  const glideRange = $("glide");
+  const reverbRange = $("reverb");
+  const distRange = $("dist");
+  const delayMixRange = $("delayMix");
+  const delayTimeRange = $("delayTime");
 
-function ensureAudio() {
-  if (!audioCtx) {
+  const glideVal = $("glideVal");
+  const reverbVal = $("reverbVal");
+  const distVal = $("distVal");
+  const delayMixVal = $("delayMixVal");
+  const delayTimeVal = $("delayTimeVal");
+
+  // ---------- Audio / Synth ----------
+  let audioCtx = null;
+  let synth = null;
+  let midiConnected = false;
+
+  const mtof = (n) => 440 * Math.pow(2, (n - 69) / 12);
+
+  function setStatus(text) {
+    if (statusEl) statusEl.textContent = text;
+    vlog("STATUS", text);
+  }
+
+  function ensureAudio() {
+    if (audioCtx) return;
+
+    vlog("AUDIO", "Creating AudioContext…");
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    master = audioCtx.createGain();
-    master.gain.value = parseFloat(masterGainEl.value);
-    master.connect(audioCtx.destination);
-    log("AudioContext created", {
-      sampleRate: audioCtx.sampleRate,
-      state: audioCtx.state,
+
+    // PolySynth defined in synth.js (no modules)
+    synth = new PolySynth(audioCtx, { log: (...a) => vlog("SYNTH", ...a) });
+
+    // Initialize FX / glide from UI sliders (if present)
+    const g = Number(glideRange?.value ?? 0);
+    const rv = Number(reverbRange?.value ?? 0.2);
+    const dv = Number(distRange?.value ?? 0.3);
+    const dm = Number(delayMixRange?.value ?? 0.2);
+    const dt = Number(delayTimeRange?.value ?? 250);
+
+    synth.setGlideMs(g);
+    synth.fx.setReverbMix(rv);
+    synth.fx.setDistortionDrive(dv);
+    synth.fx.setDelayMix(dm);
+    synth.fx.setDelayTimeMs(dt);
+
+    vlog("AUDIO", "AudioContext created. Initial params:", { g, rv, dv, dm, dt });
+
+    // expose a little debug hook
+    window.DEBUG = Object.assign(window.DEBUG || {}, {
+      ctx: audioCtx,
+      synth,
+      dumpVoices() {
+        vlog("DEBUG", "Active voices map:", synth?.active);
+      },
     });
   }
-}
 
-function forEachVoice(fn) {
-  for (const arr of voices.values()) {
-    for (const v of arr) fn(v);
-  }
-}
+  // ---------- MIDI Handling ----------
+  function connectMIDI() {
+    if (midiConnected) {
+      vlog("MIDI", "Already connected; skipping.");
+      return;
+    }
 
-function setStatus(txt) {
-  statusEl.textContent = txt;
-  log("STATUS:", txt);
-}
+    // Prefer provided MIDIengine (from your midi.js)
+    if (typeof MIDIengine !== "undefined") {
+      vlog("MIDI", "Using provided MIDIengine.");
+      try {
+        const me = new MIDIengine();
 
-function totalVoiceCount() {
-  let n = 0;
-  for (const arr of voices.values()) n += arr.length;
-  return n;
-}
+        me.onStateChange = (txt) => vlog("MIDIengine", "State:", txt);
+        me.onDeviceChange = (name) => {
+          deviceEl && (deviceEl.textContent = name || "No device");
+          vlog("MIDIengine", "Device change:", name);
+        };
+        me.onNoteOn = (note, velocity, channel) => handleNoteOn(note, velocity, channel);
+        me.onNoteOff = (note, velocity, channel) => handleNoteOff(note, velocity, channel);
+        if (typeof me.onControlChange === "function") {
+          me.onControlChange = (cc, val, ch) => vlog("MIDIengine", "CC", { cc, val, ch });
+        }
 
-// ===== Note handling (STACKED voices per note) =====
-function noteOn(note, vel = 100) {
-  ensureAudio();
+        me.init()
+          .then(() => {
+            midiConnected = true;
+            vlog("MIDIengine", "Ready.");
+          })
+          .catch((err) => vlog("ERROR", "MIDIengine init failed:", err));
 
-  // Global cap: if exceeded, free the oldest voice across all notes
-  if (totalVoiceCount() >= MAX_TOTAL_VOICES) {
-    warn("Global voice cap reached; freeing oldest voice.");
-    // find oldest by removing from the first non-empty stack we see
-    for (const [k, arr] of voices.entries()) {
-      const oldest = arr.shift();
-      if (oldest) {
-        oldest.stop();
-        setTimeout(
-          () => oldest.dispose(),
-          parseFloat(releaseEl.value) * 1000 + 40
-        );
-        if (arr.length === 0) voices.delete(k);
-        break;
+        deviceEl && (deviceEl.textContent = "MIDIengine: initializing…");
+
+      } catch (err) {
+        vlog("ERROR", "MIDIengine threw during setup:", err);
       }
+      return;
     }
-  }
 
-  // Create a new voice for EVERY Note On (retrigger behavior)
-  const v = new window.SynthVoice(audioCtx, master, {
-    type: waveSelect.value,
-    attack: parseFloat(attackEl.value),
-    release: parseFloat(releaseEl.value),
-  });
-  v.setFilter(parseFloat(cutoffEl.value), parseFloat(resQEl.value));
-  const f = mtof(note);
-  v.start(f, vel);
-
-  const stack = voices.get(note) || [];
-  stack.push(v);
-
-  // Per-note cap: if exceeded, drop the oldest for this pitch
-  if (stack.length > MAX_VOICES_PER_NOTE) {
-    const oldest = stack.shift();
-    if (oldest) {
-      oldest.stop();
-      setTimeout(
-        () => oldest.dispose(),
-        parseFloat(releaseEl.value) * 1000 + 40
-      );
-      warn(
-        `Per-note cap hit on note ${note}; dropped oldest voice. Stack now ${stack.length}.`
-      );
+    // Fallback to native Web MIDI
+    if (!navigator.requestMIDIAccess) {
+      vlog("ERROR", "Web MIDI API not supported in this browser.");
+      deviceEl && (deviceEl.textContent = "No Web MIDI support");
+      return;
     }
-  }
 
-  voices.set(note, stack);
-  log("noteOn", {
-    note,
-    freq: f,
-    vel,
-    perNoteStack: stack.length,
-    totalVoices: totalVoiceCount(),
-  });
-}
+    vlog("MIDI", "Using native Web MIDI.");
+    navigator.requestMIDIAccess().then(
+      (access) => {
+        midiConnected = true;
 
-function noteOff(note) {
-  const stack = voices.get(note);
-  if (!stack || stack.length === 0) {
-    warn("noteOff with empty stack", { note });
-    return;
-  }
+        access.onstatechange = (e) =>
+          vlog("MIDI", "statechange:", e.port?.name, e.port?.state, e.port?.type);
 
-  // Release the MOST RECENT voice (LIFO)
-  const v = stack.pop();
-  if (v) {
-    v.stop();
-    setTimeout(() => v.dispose(), parseFloat(releaseEl.value) * 1000 + 40);
-  }
+        const inputs = Array.from(access.inputs.values());
+        deviceEl &&
+          (deviceEl.textContent = inputs.length ? `Input: ${inputs[0].name}` : "No MIDI input");
 
-  if (stack.length === 0) voices.delete(note);
+        inputs.forEach((inp) => {
+          vlog("MIDI", "Binding input:", inp.name);
+          inp.onmidimessage = (e) => {
+            const [st, d1, d2] = e.data;
+            const cmd = st & 0xf0;
+            const ch = st & 0x0f;
 
-  log("noteOff", {
-    note,
-    remainingForNote: stack ? stack.length : 0,
-    totalVoices: totalVoiceCount(),
-  });
-}
+            if (cmd === 0x90 && d2 > 0) {
+              handleNoteOn(d1, d2, ch);
+            } else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) {
+              handleNoteOff(d1, d2, ch);
+            } else {
+              // optional visibility of other events
+              // vlog("MIDI", "Unhandled msg", { st, d1, d2 });
+            }
+          };
+        });
 
-// ===== MIDI parsing =====
-function handleMIDIMessage(e) {
-  const [status, d1, d2] = e.data;
-  const chan = (status & 0x0f) + 1;
-  const cmd = status & 0xf0;
-
-  if (cmd === 0x90 && d2 > 0) {
-    // Note On
-    noteOn(d1, d2);
-  } else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) {
-    // Note Off or Note On with vel=0
-    noteOff(d1);
-  } else {
-    // other messages (pitch bend, modulation, sustain, etc.)
-    // You can add CC handling here if needed.
-  }
-
-  log("MIDI msg", {
-    raw: Array.from(e.data),
-    chan,
-    cmd: "0x" + cmd.toString(16),
-  });
-}
-
-// ===== Device management (native Web MIDI) =====
-let midiAccess = null;
-let currentInput = null;
-
-function inputsArray() {
-  return midiAccess ? Array.from(midiAccess.inputs.values()) : [];
-}
-
-function listInputs() {
-  const inputs = inputsArray();
-
-  // Visual list
-  deviceListEl.innerHTML = "";
-  inputs.forEach((inp) => {
-    const li = document.createElement("li");
-    const name = document.createElement("span");
-    name.textContent = inp.name || "Unknown device";
-    const meta = document.createElement("small");
-    meta.textContent = inp.manufacturer ? `by ${inp.manufacturer}` : "";
-    li.appendChild(name);
-    li.appendChild(meta);
-    deviceListEl.appendChild(li);
-  });
-
-  // Select dropdown
-  midiSelectEl.innerHTML = "";
-  const ph = document.createElement("option");
-  ph.value = "";
-  ph.textContent = inputs.length ? "Select MIDI Input…" : "No MIDI inputs";
-  midiSelectEl.appendChild(ph);
-
-  inputs.forEach((inp) => {
-    const opt = document.createElement("option");
-    opt.value = inp.id;
-    opt.textContent = `${inp.name || `Input ${inp.id}`} (${inp.state})`;
-    midiSelectEl.appendChild(opt);
-  });
-
-  // Console visibility
-  if (inputs.length) {
-    console.table(
-      inputs.map((i) => ({
-        id: i.id,
-        name: i.name,
-        manufacturer: i.manufacturer,
-        state: i.state,
-        connection: i.connection,
-      }))
+        vlog("MIDI", "Native Web MIDI ready. Inputs:", inputs.map(i => i.name));
+      },
+      (err) => {
+        vlog("ERROR", "requestMIDIAccess failed:", err);
+      }
     );
-  } else {
-    warn("No MIDI inputs detected");
-  }
-}
-
-function attachToInputById(id) {
-  if (!midiAccess) return;
-  const wanted = inputsArray().find((i) => i.id === id);
-  if (!wanted) {
-    warn("attachToInputById: not found", id);
-    return;
   }
 
-  if (currentInput) {
-    currentInput.onmidimessage = null;
-    log("Detached previous input", {
-      id: currentInput.id,
-      name: currentInput.name,
-    });
-  }
-  currentInput = wanted;
-  currentInput.onmidimessage = handleMIDIMessage;
-  setStatus(`Using: ${currentInput.name || currentInput.id}`);
-  log("Attached input", {
-    id: currentInput.id,
-    name: currentInput.name,
-    manufacturer: currentInput.manufacturer,
-    state: currentInput.state,
-    connection: currentInput.connection,
-  });
-}
-
-// ===== Optional MIDIengine (from midi-bridge.js) =====
-let engine = null;
-function tryInitMIDIengine() {
-  if (window.MIDIengine) {
+  // ---------- Note handlers (same-note retrigger preserved) ----------
+  function handleNoteOn(note, velocity = 100, channel = 0) {
+    ensureAudio();
+    const freq = mtof(note);
+    const vel = Math.max(0.05, velocity / 127);
+    vlog("NOTE", `ON n=${note} f=${freq.toFixed(2)}Hz vel=${vel.toFixed(2)} ch=${channel}`);
     try {
-      engine = new window.MIDIengine();
-      log("MIDIengine detected and initialized");
-      // (Optional) Hook engine callbacks if needed:
-      // engine.onNoteOn = (note, vel) => noteOn(note, vel);
-      // engine.onNoteOff = (note) => noteOff(note);
-    } catch (e) {
-      err("Failed to init MIDIengine:", e);
+      synth.noteOn(note, freq, vel, channel);
+      const arr = synth.active.get(note) || [];
+      vlog("VOICES", `note ${note} voices=${arr.length} | totalHeld=${totalHeld()}`);
+    } catch (err) {
+      vlog("ERROR", "noteOn failed:", err);
     }
-  } else {
-    warn("MIDIengine not found; using native Web MIDI");
   }
-}
 
-// ===== Init MIDI =====
-async function initMIDI() {
-  // Environment diagnostics
-  log("Location", {
-    href: location.href,
-    isSecureContext,
-    protocol: location.protocol,
+  function handleNoteOff(note, _velocity = 0, channel = 0) {
+    if (!synth) return;
+    vlog("NOTE", `OFF n=${note} ch=${channel}`);
+    try {
+      synth.noteOff(note, channel);
+      const arr = synth.active.get(note) || [];
+      vlog("VOICES", `note ${note} voices=${arr.length} | totalHeld=${totalHeld()}`);
+    } catch (err) {
+      vlog("ERROR", "noteOff failed:", err);
+    }
+  }
+
+  function totalHeld() {
+    if (!synth) return 0;
+    let n = 0;
+    for (const [, arr] of synth.active) n += arr.length;
+    return n;
+  }
+
+  // ---------- UI: Start/Stop ----------
+  startBtn?.addEventListener("click", async () => {
+    try {
+      ensureAudio();
+      await audioCtx.resume();
+      setStatus("Audio running. Play your MIDI controller.");
+      connectMIDI();
+    } catch (err) {
+      vlog("ERROR", "Start failed:", err);
+    }
   });
-  if (!isSecureContext && location.hostname !== "localhost") {
-    warn(
-      "Web MIDI requires HTTPS or http://localhost. Use a local dev server or HTTPS hosting."
-    );
-  }
 
-  tryInitMIDIengine();
-
-  if (!navigator.requestMIDIAccess) {
-    setStatus("Web MIDI not supported in this browser.");
-    err("navigator.requestMIDIAccess is undefined");
-    return;
-  }
-
-  try {
-    midiAccess = await navigator.requestMIDIAccess({ sysex: false });
-    setStatus("MIDI ready. Choose an input.");
-
-    log("MIDIAccess", {
-      inputs: midiAccess.inputs.size,
-      outputs: midiAccess.outputs.size,
-      sysexEnabled: midiAccess.sysexEnabled,
-    });
-
-    listInputs();
-
-    midiAccess.onstatechange = (ev) => {
-      const port = ev.port;
-      log("MIDI statechange", {
-        type: port.type,
-        id: port.id,
-        name: port.name,
-        state: port.state,
-        connection: port.connection,
-      });
-      listInputs();
-    };
-  } catch (e) {
-    setStatus("MIDI access was denied. Check site permissions.");
-    err("requestMIDIAccess failed", e);
-  }
-}
-
-// ===== UI wiring =====
-startBtn.addEventListener("click", async () => {
-  ensureAudio();
-  if (audioCtx.state === "suspended") {
-    await audioCtx.resume();
-    log("AudioContext resumed");
-  }
-  setStatus("Audio started. Choose a MIDI input and play!");
-});
-
-stopBtn.addEventListener("click", async () => {
-  if (!audioCtx) return;
-  // stop & dispose every voice
-  for (const arr of voices.values()) {
-    for (const v of arr) {
-      v.stop();
-      v.dispose();
+  stopBtn?.addEventListener("click", () => {
+    try {
+      if (audioCtx && audioCtx.state !== "suspended") {
+        audioCtx.suspend();
+        setStatus("Audio suspended.");
+        vlog("AUDIO", "AudioContext suspended.");
+      }
+    } catch (err) {
+      vlog("ERROR", "Stop failed:", err);
     }
+  });
+
+  // ---------- UI: Sliders → live params ----------
+  function pushUIToEngine() {
+    if (!synth) return;
+    const g = Number(glideRange?.value ?? 0);
+    const rv = Number(reverbRange?.value ?? 0);
+    const dv = Number(distRange?.value ?? 0);
+    const dm = Number(delayMixRange?.value ?? 0);
+    const dt = Number(delayTimeRange?.value ?? 250);
+
+    if (glideVal) glideVal.textContent = g.toFixed(0);
+    if (reverbVal) reverbVal.textContent = rv.toFixed(2);
+    if (distVal) distVal.textContent = dv.toFixed(2);
+    if (delayMixVal) delayMixVal.textContent = dm.toFixed(2);
+    if (delayTimeVal) delayTimeVal.textContent = dt.toFixed(0);
+
+    synth.setGlideMs(g);
+    synth.fx.setReverbMix(rv);
+    synth.fx.setDistortionDrive(dv);
+    synth.fx.setDelayMix(dm);
+    synth.fx.setDelayTimeMs(dt);
+
+    vlog("UI→FX", { glideMs: g, reverbMix: rv, drive: dv, delayMix: dm, delayMs: dt });
   }
-  voices.clear();
-  await audioCtx.suspend();
-  log("AudioContext suspended");
-  setStatus("Audio suspended.");
-});
 
-refreshBtn.addEventListener("click", () => {
-  listInputs();
-  setStatus("Device list refreshed.");
-});
+  const sliderEls = [glideRange, reverbRange, distRange, delayMixRange, delayTimeRange].filter(Boolean);
+  sliderEls.forEach((el) => el.addEventListener("input", pushUIToEngine));
 
-midiSelectEl.addEventListener("change", (e) => {
-  const id = e.target.value;
-  if (!id) {
-    warn("No input selected");
-    return;
-  }
-  attachToInputById(id);
-});
+  // Prefill label values at load (even before audio init)
+  (function primeLabels() {
+    if (glideVal && glideRange) glideVal.textContent = Number(glideRange.value).toFixed(0);
+    if (reverbVal && reverbRange) reverbVal.textContent = Number(reverbRange.value).toFixed(2);
+    if (distVal && distRange) distVal.textContent = Number(distRange.value).toFixed(2);
+    if (delayMixVal && delayMixRange) delayMixVal.textContent = Number(delayMixRange.value).toFixed(2);
+    if (delayTimeVal && delayTimeRange) delayTimeVal.textContent = Number(delayTimeRange.value).toFixed(0);
+  })();
 
-// sliders update
-function bindRange(input, label, cb, fmt = (v) => v) {
-  function update() {
-    label.textContent = fmt(input.value);
-    cb(parseFloat(input.value));
-  }
-  input.addEventListener("input", update);
-  update();
-}
+  // Optional: resume audio on user gesture anywhere (some browsers require)
+  window.addEventListener("pointerdown", async () => {
+    if (audioCtx && audioCtx.state === "suspended") {
+      await audioCtx.resume();
+      setStatus("Audio running (auto-resume).");
+    }
+  });
 
-bindRange(
-  masterGainEl,
-  masterGainVal,
-  (v) => {
-    if (master) master.gain.value = v;
-  },
-  (v) => Number(v).toFixed(2)
-);
-bindRange(cutoffEl, cutoffVal, (v) => {
-  for (const arr of voices.values())
-    for (const vv of arr) vv.setFilter(v, parseFloat(resQEl.value));
-});
-bindRange(resQEl, resQVal, (v) => {
-  for (const arr of voices.values())
-    for (const vv of arr) vv.setFilter(parseFloat(cutoffEl.value), v);
-});
-bindRange(
-  attackEl,
-  attackVal,
-  (_) => {
-    /* applied to new voices */
-  },
-  (v) => Number(v).toFixed(3)
-);
-bindRange(
-  releaseEl,
-  releaseVal,
-  (_) => {
-    /* applied to new voices */
-  },
-  (v) => Number(v).toFixed(2)
-);
-
-waveSelect.addEventListener("change", () => {
-  for (const arr of voices.values())
-    for (const v of arr) v.setWave(waveSelect.value);
-  log("Waveform changed", waveSelect.value);
-});
-
-// DOM ready
-window.addEventListener("DOMContentLoaded", initMIDI);
+  // Log visibility changes (handy for debugging)
+  document.addEventListener("visibilitychange", () => {
+    vlog("PAGE", "visibility:", document.visibilityState, "audio:", audioCtx?.state);
+  });
+})();

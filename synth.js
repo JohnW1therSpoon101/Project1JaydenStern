@@ -1,120 +1,126 @@
-// Classic script version (no modules) + verbose logging + RETRIGGER
-(function () {
-  function clamp(v, lo, hi) {
-    return Math.max(lo, Math.min(hi, v));
-  }
-  function nowStr() {
-    return new Date().toISOString();
-  }
-  function log(...a) {
-    console.log(`[synth ${nowStr()}]`, ...a);
-  }
+class SimpleFX {
+  constructor(ctx, { log = console.log } = {}) {
+    this.ctx = ctx; this.log = log;
+    this.master = ctx.createGain();
+    this.master.gain.value = 0.9;
 
-  function SynthVoice(audioCtx, destination, opts) {
-    this.ctx = audioCtx;
-    this.opts = Object.assign(
-      { type: "sawtooth", attack: 0.01, release: 0.12 },
-      opts || {}
-    );
+    // Distortion
+    this.drive = 0.3;
+    this.shaper = ctx.createWaveShaper();
+    this._updateCurve();
 
-    this.filter = this.ctx.createBiquadFilter();
-    this.filter.type = "lowpass";
-    this.filter.frequency.value = 4000;
-    this.filter.Q.value = 1.0;
+    // Delay
+    this.delay = ctx.createDelay(1.2);
+    this.delay.delayTime.value = 0.25;
+    this.delayMix = ctx.createGain(); this.delayMix.gain.value = 0.2;
+    this.delayFB = ctx.createGain(); this.delayFB.gain.value = 0.35;
 
-    this.out = this.ctx.createGain();
-    this.out.gain.value = 0.0;
+    // Reverb
+    this.reverb = ctx.createConvolver();
+    this.reverb.buffer = this._makeImpulse(1.8);
+    this.reverbMix = ctx.createGain(); this.reverbMix.gain.value = 0.2;
 
-    this.filter.connect(this.out);
-    this.out.connect(destination);
-
-    this.osc = this.ctx.createOscillator();
-    this.osc.type = this.opts.type;
-    this.osc.connect(this.filter);
-    this.started = false;
-
-    log("Voice created", {
-      type: this.osc.type,
-      attack: this.opts.attack,
-      release: this.opts.release,
-    });
+    this.input = ctx.createGain();
+    this.input.connect(this.shaper);
+    this.shaper.connect(this.master);
+    this.shaper.connect(this.reverb);
+    this.reverb.connect(this.reverbMix);
+    this.reverbMix.connect(this.master);
+    this.shaper.connect(this.delay);
+    this.delay.connect(this.delayFB);
+    this.delayFB.connect(this.delay);
+    this.delay.connect(this.delayMix);
+    this.delayMix.connect(this.master);
+    this.master.connect(ctx.destination);
   }
 
-  SynthVoice.prototype.setWave = function (type) {
-    if (this.osc) this.osc.type = type;
-    log("Wave set", type);
-  };
+  setReverbMix(v){ this.reverbMix.gain.value = v; }
+  setDistortionDrive(v){ this.drive = v; this._updateCurve(); }
+  setDelayMix(v){ this.delayMix.gain.value = v; }
+  setDelayTimeMs(ms){ this.delay.delayTime.value = ms / 1000; }
 
-  SynthVoice.prototype.setFilter = function (cutoff, q) {
-    const now = this.ctx.currentTime;
-    this.filter.frequency.setValueAtTime(cutoff, now);
-    this.filter.Q.setValueAtTime(q, now);
-    log("Filter set", { cutoff, q });
-  };
-
-  // Normal start (first Note On for a note)
-  SynthVoice.prototype.start = function (freq, velocity) {
-    const now = this.ctx.currentTime;
-    if (!this.started) {
-      this.osc.start();
-      this.started = true;
+  _updateCurve(){
+    const k = 1 + this.drive * 150;
+    const n = 2048; const curve = new Float32Array(n);
+    for (let i = 0; i < n; ++i) {
+      const x = (i * 2) / n - 1;
+      curve[i] = ((3 + k) * x * 20 * Math.PI / 180) / (Math.PI + k * Math.abs(x));
     }
-    this.osc.frequency.setValueAtTime(freq, now);
+    this.shaper.curve = curve; this.shaper.oversample = '4x';
+  }
 
-    const vel = clamp(velocity || 100, 0, 127);
-    const peak = (vel / 127) * 0.35;
-    const atk = this.opts.attack;
-
-    this.out.gain.cancelScheduledValues(now);
-    // retrigger-friendly: start from a very low value (avoids clicks)
-    this.out.gain.setValueAtTime(0.0001, now);
-    this.out.gain.linearRampToValueAtTime(peak, now + atk);
-    this.out.gain.linearRampToValueAtTime(peak * 0.95, now + atk + 0.05);
-
-    log("Note start", { freq, velocity: vel, peak, atk });
-  };
-
-  // NEW: explicit retrigger when the same note gets pressed again
-  SynthVoice.prototype.retrigger = function (freq, velocity) {
-    const now = this.ctx.currentTime;
-    if (!this.started) {
-      this.osc.start();
-      this.started = true;
+  _makeImpulse(seconds){
+    const rate = this.ctx.sampleRate; const len = Math.floor(seconds * rate);
+    const buf = this.ctx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++){
+      const data = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i/len, 2.8);
     }
-    if (typeof freq === "number") this.osc.frequency.setValueAtTime(freq, now);
+    return buf;
+  }
+}
 
-    const vel = clamp(velocity || 100, 0, 127);
-    const peak = (vel / 127) * 0.35;
-    const atk = this.opts.attack;
+class SynthVoice {
+  constructor(ctx, out, { glideMs = 0 } = {}){
+    this.ctx = ctx; this.out = out; this.glideMs = glideMs;
+    this.osc = ctx.createOscillator(); this.osc.type = 'sawtooth';
+    this.vcf = ctx.createBiquadFilter(); this.vcf.type = 'lowpass'; this.vcf.frequency.value = 12000;
+    this.amp = ctx.createGain(); this.amp.gain.value = 0.0;
+    this.osc.connect(this.vcf); this.vcf.connect(this.amp); this.amp.connect(out);
+    this.osc.start();
+    this.A = 0.005; this.D = 0.08; this.S = 0.65; this.R = 0.18;
+  }
 
-    // Hard reset envelope to a tiny value, then run the attack again
-    this.out.gain.cancelScheduledValues(now);
-    this.out.gain.setValueAtTime(0.0001, now);
-    this.out.gain.linearRampToValueAtTime(peak, now + atk);
-    this.out.gain.linearRampToValueAtTime(peak * 0.95, now + atk + 0.05);
+  trigger(freq, velocity, legatoFromFreq = null){
+    const t = this.ctx.currentTime;
+    if (legatoFromFreq != null) {
+      this.osc.frequency.setValueAtTime(legatoFromFreq, t);
+      const glide = this.glideMs / 1000;
+      this.osc.frequency.linearRampToValueAtTime(freq, t + glide);
+    } else this.osc.frequency.setValueAtTime(freq, t);
+    this.amp.gain.setValueAtTime(0, t);
+    this.amp.gain.linearRampToValueAtTime(velocity, t + this.A);
+    this.amp.gain.linearRampToValueAtTime(this.S * velocity, t + this.A + this.D);
+  }
 
-    log("Retrigger", { velocity: vel, peak, atk });
-  };
+  release(){
+    const t = this.ctx.currentTime;
+    this.amp.gain.cancelScheduledValues(t);
+    this.amp.gain.setTargetAtTime(0, t, this.R);
+    setTimeout(() => { try { this.osc.stop(); } catch{} }, this.R * 1000 + 120);
+  }
 
-  SynthVoice.prototype.stop = function () {
-    const now = this.ctx.currentTime;
-    const rel = this.opts.release;
-    this.out.gain.cancelScheduledValues(now);
-    this.out.gain.setValueAtTime(this.out.gain.value, now);
-    this.out.gain.linearRampToValueAtTime(0.0001, now + rel);
-    log("Note stop (release)", { release: rel });
-  };
+  setGlideMs(ms){ this.glideMs = ms; }
+}
 
-  SynthVoice.prototype.dispose = function () {
-    try {
-      this.osc.stop();
-    } catch {}
-    this.osc.disconnect();
-    this.filter.disconnect();
-    this.out.disconnect();
-    log("Voice disposed");
-  };
+class PolySynth {
+  constructor(ctx, { log = console.log } = {}){
+    this.ctx = ctx; this.log = log;
+    this.fx = new SimpleFX(ctx, { log });
+    this.active = new Map();
+    this.lastFreq = null;
+  }
 
-  window.SynthVoice = SynthVoice;
-  console.log("[synth] SynthVoice ready (classic script with retrigger)");
-})();
+  setGlideMs(ms){ this.glideMs = ms; }
+
+  noteOn(note, freq, velocity){
+    const arr = this.active.get(note) || [];
+    const legatoFrom = this._anyHeld() ? this.lastFreq : null;
+    const v = new SynthVoice(this.ctx, this.fx.input, { glideMs: this.glideMs });
+    v.trigger(freq, velocity, legatoFrom);
+    arr.push(v);
+    this.active.set(note, arr);
+    this.lastFreq = freq;
+  }
+
+  noteOff(note){
+    const arr = this.active.get(note);
+    if (!arr?.length) return;
+    const v = arr.pop();
+    if (v) v.release();
+    if (!arr.length) this.active.delete(note);
+    if (!this._anyHeld()) this.lastFreq = null;
+  }
+
+  _anyHeld(){ for (const [, arr] of this.active) if (arr.length) return true; return false; }
+}
