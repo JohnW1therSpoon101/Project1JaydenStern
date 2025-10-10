@@ -25,7 +25,7 @@ Midi Detection:
 Prebuilt sound library: users will pick from a list of presets, or hit custom preset to build their own sound
 Presets = this is going to be empty for now. when users go to chose, only display the custom option for them to select 
 
-Controls: 
+Controls: organize in order
 Sliders: 
 - Oscillators
 - - User will pick between 1-3 oscillators
@@ -34,12 +34,18 @@ Sliders:
 - - will have a box to check whether user wants to use it or not. 
 - - if selected, different kind of slide happens, itll be like a weird slide inbetween notes, not upon the start of the note
 - Glide
-- master (gain)
+- 4master (gain)
 - Delay Mix
-- - only when delay is selected, provide initial delay customizations
+- 
 - Reverb Mix
-- - only when reverb is selected, provide initial delay customization
+- 
 - Distortion Drive
+- I want the layout to look something like this...
+- - (section1) Oscillators 
+- - (section2) Delay (only slider) 
+- - (section3) Reverb (only slider)
+- - (section4) Glide (only slider) 
+- - (section5) Mono (only button) 
 
 Log: 
 - Keep a live log displayed at the bottom of the website so that the user can see what's going on when the midi is used. 
