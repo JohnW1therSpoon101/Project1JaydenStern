@@ -1,177 +1,157 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Welcome 2 WebInstrument 🎹</title>
+  <meta charset="utf-8" />
+  <title>WebInstrument — Stxrn</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{
-      --bg:#000; --fg:#e6ebef; --card:#0d0d10; --muted:#9aa3ad;
-      --line:#1e2230; --accent:#2563eb; --accent2:#7c3aed;
+      --bg:#000; --panel:#0f0f0f; --panel2:#141414; --text:#eaeaea;
+      --accent:#7cf; --muted:#999; --good:#6f6; --bad:#f66;
     }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--fg);
-         font:16px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-    .wrap{max-width:1040px;margin:0 auto;padding:26px}
-    .card{background:var(--card);border:1px solid #141419;border-radius:14px;padding:16px;margin:0 0 16px;
-          box-shadow:0 10px 28px rgba(0,0,0,.45)}
-    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-    .col{display:flex;flex-direction:column;gap:6px}
-    .title{font-family:cursive;font-size:40px;margin:0 0 6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .byline{font-family:cursive;font-size:20px;margin:0 0 8px;color:#d7dbdf;display:flex;gap:8px;align-items:center}
-    .linkline{margin:0 0 12px;font-weight:700}
-    .linkline a{color:#9cc3ff;text-decoration:underline}
-    .badge{background:#15151a;border:1px solid #2a2a33;border-radius:999px;padding:4px 12px;font-size:12px}
-    .status{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0b0b0d;color:#cbd5e1;
-            padding:10px 12px;border-radius:10px;border:1px solid #1a1a1f}
-    button{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;
-           padding:10px 14px;border-radius:11px;font-weight:700;cursor:pointer}
-    button.secondary{background:#33343d}
-    label{font-weight:700}
-    .sub{color:var(--muted);font-size:12px}
-    input[type="range"]{width:260px}
-    select, input[type="checkbox"]{padding:8px;border-radius:10px;border:1px solid #2a2a33;background:#0d0d12;color:var(--fg)}
-    .sectionTitle{margin:0 0 10px;font-weight:800;display:flex;gap:8px;align-items:center}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
-    .hide{display:none}
-    .logs{max-height:280px;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;background:#0b0b0d;
-          border:1px solid #1a1a1f;border-radius:12px;padding:12px;white-space:pre-wrap}
+    html,body{height:100%}
+    body{background:var(--bg); margin:0; color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; line-height:1.5;}
+    header{text-align:center; padding:24px 16px 8px;}
+    .title{font-family:"Brush Script MT","Snell Roundhand","Comic Sans MS",cursive; font-size:42px; letter-spacing:.5px;}
+    .subtitle{font-family:"Brush Script MT","Snell Roundhand","Comic Sans MS",cursive; font-size:22px; margin-top:6px;}
+    .link-row{margin-top:8px; font-size:16px;}
+    .link-row a{color:var(--accent); text-decoration:none; border-bottom:1px dotted var(--accent);}
+    .emoji-splash{text-align:center; font-size:22px; opacity:.9; letter-spacing:2px; margin-top:10px;}
+    .wrap{max-width:1000px; margin:0 auto; padding:12px 16px 24px;}
+    .panel{background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid #1f1f1f; border-radius:14px; padding:16px; margin:12px 0; box-shadow:0 10px 24px rgba(0,0,0,.35);}
+    h2{margin:0 0 10px; font-size:18px; letter-spacing:.3px;}
+    .row{display:grid; grid-template-columns: 180px 1fr 120px; gap:12px; align-items:center; margin:10px 0;}
+    .row label{color:#cfcfcf;}
+    input[type="range"]{width:100%;}
+    select,button,input[type="checkbox"]{font-size:14px;}
+    .small{color:var(--muted); font-size:12px;}
+    .chips{display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:13px;}
+    .chip{background:#111; border:1px solid #222; padding:4px 8px; border-radius:999px;}
+    .btn{padding:8px 12px; border-radius:10px; border:1px solid #2a2a2a; background:#121212; color:var(--text); cursor:pointer;}
+    .btn:active{transform:translateY(1px)}
+    .good{color:var(--good)} .bad{color:var(--bad)}
+    .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+    #log{background:#0a0a0a; border:1px solid #1b1b1b; border-radius:10px; padding:10px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; max-height:240px; overflow:auto; white-space:pre-wrap;}
+    @media (max-width:800px){ .row{grid-template-columns: 120px 1fr 80px} .grid2{grid-template-columns:1fr} }
   </style>
 </head>
 <body>
+  <header>
+    <div class="title">🎹🎧🎵 Welcome 2 WebInstrument 🎶🥁🎼</div>
+    <div class="subtitle">Built by: Jayden Stern</div>
+    <div class="link-row">
+      for more click
+      <a href="https://linktr.ee/stxrntheartist?utm_source=linktree_profile_share&ltsid=c8144ae5-97a2-4826-ab14-50953b2441ec" target="_blank" rel="noopener">HERE</a>
+    </div>
+    <div class="emoji-splash">🎷 🎸 🎻 🥁 🎛️ 🎚️ 🎙️ 🔊 🎶</div>
+  </header>
+
   <div class="wrap">
-    <!-- Header -->
-    <h1 class="title">🎶 Welcome 2 WebInstrument 🎧</h1>
-    <h2 class="byline">🎼 Built by: Jayden Stern</h2>
-    <p class="linkline">for more click
-      <a href="https://linktr.ee/stxrntheartist?utm_source=linktree_profile_share&ltsid=c8144ae5-97a2-4826-ab14-50953b2441ec" target="_blank" rel="noopener noreferrer">HERE</a> 🎵🎷🥁
-    </p>
-    <p id="status" class="status">Click <strong>Start Audio</strong> → play your MIDI device. Open DevTools for extra logs. 🎛️</p>
+    <div class="panel">
+      <h2>Audio & MIDI Setup</h2>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <button id="startBtn" class="btn">▶️ Start Audio</button>
+        <div id="audioStatus" class="small">Audio: <span class="bad">stopped</span></div>
+        <div class="chip">Sample Rate: <span id="sr">—</span></div>
+      </div>
 
-    <!-- Transport -->
-    <div class="card">
       <div class="row">
-        <button id="startBtn">Start Audio ▶️</button>
-        <button id="stopBtn" class="secondary">Stop Audio ⏸️</button>
-        <span id="deviceInfo" class="badge">No MIDI yet 🎹</span>
+        <label>🎛️ MIDI Device</label>
+        <select id="midiSelect"></select>
+        <button id="refreshBtn" class="btn">🔄 Refresh</button>
+      </div>
+      <div class="small">Status: <span id="midiStatus">Searching…</span></div>
+      <div class="chips">
+        <span class="chip">Note On/Off logging</span>
+        <span class="chip">Poly OR Mono (glide)</span>
+        <span class="chip">Same-note retrigger ✅</span>
       </div>
     </div>
 
-    <!-- MIDI Detection -->
-    <div class="card">
-      <div class="sectionTitle">🎚️ MIDI Detection</div>
-      <div class="row">
-        <label for="midiInput">Device:</label>
-        <select id="midiInput"></select>
-        <button id="refreshMidi" class="secondary">Refresh 🔄</button>
-      </div>
-      <p class="sub">Pick which connected MIDI device to use. If you plug a new one, hit Refresh. 🎺</p>
-    </div>
-
-    <!-- Presets -->
-    <div class="card">
-      <div class="sectionTitle">🎛️ Presets</div>
-      <div class="row">
-        <label for="preset">Choose:</label>
-        <select id="preset">
-          <!-- Only Custom for now per spec -->
-          <option value="custom" selected>Custom (build your own) 🌟</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Controls -->
-    <div class="card">
-      <div class="sectionTitle">🎚️ Controls</div>
-
-      <div class="grid">
-        <!-- Oscillators -->
-        <div class="col">
-          <label>Oscillator Count <span class="sub" id="oscCountVal">1</span> 🎛️</label>
-          <input id="oscCount" type="range" min="1" max="3" step="1" value="1"/>
+    <div class="grid2">
+      <div class="panel">
+        <h2>Oscillators</h2>
+        <div class="row">
+          <label>Count (1–3)</label>
+          <input id="oscCount" type="range" min="1" max="3" step="1" value="2" />
+          <span id="oscCountVal">2</span>
         </div>
-        <div class="col">
-          <label>Waveform 🎶</label>
+        <div class="row">
+          <label>Waveform</label>
           <select id="waveform">
-            <option value="sine">sine</option>
+            <option value="sawtooth">sawtooth</option>
             <option value="square">square</option>
-            <option value="sawtooth" selected>sawtooth</option>
             <option value="triangle">triangle</option>
+            <option value="sine">sine</option>
           </select>
+          <span class="small">applies to all oscillators</span>
         </div>
+      </div>
 
-        <!-- Mono / Glide -->
-        <div class="col">
-          <label for="monoChk">Mono mode (in-between note slide) 🎙️</label>
-          <div class="row">
-            <input type="checkbox" id="monoChk"/>
-            <span class="sub">If enabled, new notes glide from the current note without retriggering attack.</span>
-          </div>
+      <div class="panel">
+        <h2>Mono</h2>
+        <div class="row">
+          <label>Mono (Legato)</label>
+          <input id="mono" type="checkbox" />
+          <span class="small">when on, new notes glide</span>
         </div>
-        <div class="col">
-          <label>Glide (ms) <span class="sub" id="glideVal">0</span> 🌀</label>
-          <input id="glide" type="range" min="0" max="600" step="5" value="0" />
-        </div>
-
-        <!-- Master -->
-        <div class="col">
-          <label>Master Gain <span class="sub" id="masterVal">0.90</span> 🎚️</label>
-          <input id="master" type="range" min="0" max="1" step="0.01" value="0.90"/>
-        </div>
-
-        <!-- Delay -->
-        <div class="col">
-          <label for="delayEnable">Delay Enable ⏱️</label>
-          <div class="row"><input type="checkbox" id="delayEnable" checked/></div>
-        </div>
-        <div id="delayParams" class="grid">
-          <div class="col">
-            <label>Delay Mix <span class="sub" id="delayMixVal">0.20</span></label>
-            <input id="delayMix" type="range" min="0" max="1" step="0.01" value="0.20" />
-          </div>
-          <div class="col">
-            <label>Delay Time (ms) <span class="sub" id="delayTimeVal">250</span></label>
-            <input id="delayTime" type="range" min="20" max="800" step="5" value="250" />
-          </div>
-          <div class="col">
-            <label>Delay Feedback <span class="sub" id="delayFbVal">0.35</span></label>
-            <input id="delayFb" type="range" min="0" max="0.95" step="0.01" value="0.35" />
-          </div>
-        </div>
-
-        <!-- Reverb -->
-        <div class="col">
-          <label for="reverbEnable">Reverb Enable 🌫️</label>
-          <div class="row"><input type="checkbox" id="reverbEnable" checked/></div>
-        </div>
-        <div id="reverbParams" class="grid">
-          <div class="col">
-            <label>Reverb Mix <span class="sub" id="reverbVal">0.20</span></label>
-            <input id="reverb" type="range" min="0" max="1" step="0.01" value="0.20" />
-          </div>
-          <div class="col">
-            <label>Reverb Time (s) <span class="sub" id="reverbTimeVal">1.80</span></label>
-            <input id="reverbTime" type="range" min="0.2" max="6" step="0.05" value="1.8" />
-          </div>
-        </div>
-
-        <!-- Distortion -->
-        <div class="col">
-          <label>Distortion Drive <span class="sub" id="distVal">0.30</span> 🔥</label>
-          <input id="dist" type="range" min="0" max="1" step="0.01" value="0.30" />
+        <div class="row">
+          <label>Glide (ms)</label>
+          <input id="glide" type="range" min="0" max="400" step="5" value="90" />
+          <span id="glideVal">90</span>
         </div>
       </div>
     </div>
 
-    <!-- Logs -->
-    <div class="card">
-      <div class="sectionTitle">📋 Live Log</div>
-      <div id="logs" class="logs"></div>
+    <div class="grid2">
+      <div class="panel">
+        <h2>Delay</h2>
+        <div class="row">
+          <label>Delay Mix</label>
+          <input id="delayMix" type="range" min="0" max="1" step="0.01" value="0.15" />
+          <span id="delayMixVal">0.15</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Reverb</h2>
+        <div class="row">
+          <label>Reverb Mix</label>
+          <input id="reverbMix" type="range" min="0" max="1" step="0.01" value="0.2" />
+          <span id="reverbMixVal">0.20</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h2>Distortion</h2>
+        <div class="row">
+          <label>Drive</label>
+          <input id="drive" type="range" min="0" max="1" step="0.01" value="0.0" />
+          <span id="driveVal">0.00</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Gain</h2>
+        <div class="row">
+          <label>Master</label>
+          <input id="master" type="range" min="0" max="1" step="0.01" value="0.5" />
+          <span id="masterVal">0.50</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Live Log</h2>
+      <div id="log" aria-live="polite"></div>
     </div>
   </div>
 
-  <script src="midi.js"></script>
-  <script src="synth.js"></script>
-  <script src="main.js"></script>
+  <!-- DO NOT TOUCH midi.js -->
+  <script src="./midi.js"></script>
+  <script src="./synth.js"></script>
+  <script src="./main.js"></script>
 </body>
 </html>
